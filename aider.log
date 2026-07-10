@@ -2490,3 +2490,975 @@ Applied edit to
 a-campus-tutoring-marketplace-post-a-lis-7w596/app/api/items/route.ts
 Applied edit to a-campus-tutoring-marketplace-post-a-lis-7w596/app/page.tsx
 Commit f170014 feat: replace starter UI with tutoring marketplace and items API
+Warning: Input is not a terminal (fd=0).
+────────────────────────────────────────────────────────────────────────────────
+Aider v0.86.2
+Model: anthropic/claude-sonnet-5 with whole edit format
+Git repo: ../.git with 28 files
+Repo-map: using 4096 tokens, auto refresh
+Added a-campus-tutoring-marketplace-post-a-lis-7w596/app/globals.css to the 
+chat.
+Added a-campus-tutoring-marketplace-post-a-lis-7w596/app/page.tsx to the chat.
+Note: in-chat filenames are always relative to the git working dir, not the 
+current working dir.
+Cur working dir: 
+/home/runner/work/a-campus-tutoring-marketplace-post-a-lis-7w596/a-campus-tutori
+ng-marketplace-post-a-lis-7w596/a-campus-tutoring-marketplace-post-a-lis-7w596
+Git working dir: 
+/home/runner/work/a-campus-tutoring-marketplace-post-a-lis-7w596/a-campus-tutori
+ng-marketplace-post-a-lis-7w596
+
+
+app/page.tsx
+Here's my review against the rubric:                                            
+
+Grade: B+ → needs targeted fixes, not a rewrite.                                
+
+What's already working: sensible information architecture, decent               
+empty/loading/error scaffolding, single indigo accent, hairline borders +       
+rounded-xl, no gradients/emoji.                                                 
+
+Gaps I'm closing:                                                               
+
+ 1 Weight budget blown — font-medium shows up on labels, badges, the "Book this 
+   slot" button, and the "Dismiss"/"Try again" links, on top of font-semibold   
+   elsewhere. That's 3 weights. Cutting font-medium everywhere; reserving       
+   font-semibold only for true headings, the price, and the single primary CTA. 
+   Secondary/tertiary actions (Book, Dismiss, Try again) drop to normal weight  
+   so the primary action actually reads as primary.                             
+ 2 Spacing had off-grid fractions — py-2.5, space-y-1.5, py-0.5, py-1.5 break   
+   the rhythm. Normalizing everything to the 4/8pt scale (2, 4, 6, 8, 12, 16,   
+   24, 32…) and giving the card and list items more breathing room (p-6→p-8 on  
+   the form card, p-5→p-6 on listing cards).                                    
+ 3 Mobile-first gap — the rate/slot fields used a hard grid-cols-2 that gets    
+   cramped on small phones. Switched to grid-cols-1 sm:grid-cols-2.             
+ 4 Error/loading states weren't "real" enough — generic fallback copy           
+   ("Something went wrong," "Could not book this slot") isn't product-specific  
+   and wasn't wired for assistive tech. Rewrote copy to speak to this           
+   marketplace (slots getting sniped, connectivity to the listings service) and 
+   added role="status" / role="alert" so screen readers actually announce       
+   loading and error states.                                                    
+ 5 Secondary actions were competing with the primary one — "Book this slot" was 
+   bold + accent-colored, same visual weight as "Post listing." Restraint rule  
+   says one accent, one hero action — kept the accent color for affordance but  
+   dropped the bold weight so the filled indigo button is unambiguously the     
+   primary action.                                                              
+
+Everything else (focus-visible rings, transitions, hairline borders, API calls, 
+state names, handlers) is untouched and still fully functional.                 
+
+app/page.tsx                                                                    
+
+                                                                                
+@@ -9,5 +9,6 @@                                                                 
+   description: string;                                                         
+     try {                                                                      
+       const res = await fetch("/api/items", { cache: "no-store" });            
+       const data = await res.json();                                           
+       if (!res.ok) {                                                           
+-        throw new Error(data.error || "Couldn't load listings.");              
++        throw new Error(                                                       
++          data.error || "The listings service didn't respond. Give it another  
+try."                                                                           
++        );                                                                     
+       }                                                                        
+       setListings(data.listings as Listing[]);                                 
+     } catch (err) {                                                            
+       setLoadError(                                                            
+-        err instanceof Error ? err.message : "Couldn't load listings."         
++        err instanceof Error                                                   
++          ? err.message                                                        
++          : "We couldn't reach the listings service. Check your connection and 
+try again."                                                                     
+       );                                                                       
+     } finally {                                                                
+       setLoading(false);                                                       
+     }                                                                          
+   }, []);                                                                      
+@@ -87,5 +91,6 @@                                                               
+   useEffect(() => {                                                            
+     loadListings();                                                            
+       });                                                                      
+       const data = await res.json();                                           
+       if (!res.ok) {                                                           
+-        throw new Error(data.error || "Something went wrong.");                
++        throw new Error(data.error || "We couldn't post that slot. Try         
+again.");                                                                       
+       }                                                                        
+       setListings((prev) => [data.listing as Listing, ...prev]);               
+       setFormState(EMPTY_FORM);                                                
+     } catch (err) {                                                            
+-      setFormError(err instanceof Error ? err.message : "Something went        
+wrong.");                                                                       
+-    } finally {                                                                
+-      setSubmitting(false);                                                    
+-    }                                                                          
+-  }                                                                            
+-                                                                               
+-  async function handleBook(id: string) {                                      
+-    setActionError(null);                                                      
+-    setPendingIds((prev) => new Set(prev).add(id));                            
+-    try {                                                                      
+-      const res = await fetch(`/api/items?id=${id}`, {                         
+-        method: "PATCH",                                                       
+-        headers: { "Content-Type": "application/json" },                       
+-        body: JSON.stringify({ status: "booked" }),                            
+-      });                                                                      
+-      const data = await res.json();                                           
+-      if (!res.ok) {                                                           
+-        throw new Error(data.error || "Could not book this slot.");            
+-      }                                                                        
+-      setListings((prev) =>                                                    
+-        prev.map((item) => (item.id === id ? (data.listing as Listing) : item))
+       }                                                                        
+       setListings((prev) =>                                                    
+         prev.map((item) => (item.id === id ? (data.listing as Listing) : item))
+       );                                                                       
+     } catch (err) {                                                            
+       setActionError(                                                          
+-        err instanceof Error ? err.message : "Could not book this slot."       
++        err instanceof Error                                                   
++          ? err.message                                                        
++          : "Someone may have just booked this slot. Refresh to see what's     
+open."                                                                          
+       );                                                                       
+     } finally {                                                                
+       setPendingIds((prev) => {                                                
+         const next = new Set(prev);                                            
+         next.delete(id);                                                       
+@@ -165,5 +175,6 @@                                                             
+     }                                                                          
+     try {                                                                      
+       const res = await fetch(`/api/items?id=${id}`, { method: "DELETE" });    
+       if (!res.ok) {                                                           
+         const data = await res.json();                                         
+-        throw new Error(data.error || "Could not delete this listing.");       
++        throw new Error(                                                       
++          data.error || "That listing may have already been removed."          
++        );                                                                     
+       }                                                                        
+       setListings((prev) => prev.filter((item) => item.id !== id));            
+     } catch (err) {                                                            
+       setActionError(                                                          
+-        err instanceof Error ? err.message : "Could not delete this listing."  
++        err instanceof Error                                                   
++          ? err.message                                                        
++          : "That listing may have already been removed."                      
+       );                                                                       
+     } finally {                                                                
+       setPendingIds((prev) => {                                                
+         const next = new Set(prev);                                            
+         next.delete(id);                                                       
+@@ -187,5 +201,6 @@                                                             
+       });                                                                      
+   }                                                                            
+                                                                                
+   return (                                                                     
+     <div className="min-h-screen bg-zinc-50">                                  
+-      <div className="mx-auto max-w-6xl px-6 py-12 sm:px-8 lg:px-10 lg:py-16"> 
+-        <header className="mb-12 max-w-2xl space-y-3">                         
++      <div className="mx-auto max-w-6xl px-6 py-12 sm:px-8 lg:px-12 lg:py-20"> 
++        <header className="mb-16 max-w-2xl space-y-4">                         
+           <p className="text-sm font-semibold uppercase tracking-wide          
+text-indigo-600">                                                               
+             Campus Tutoring                                                    
+           </p>                                                                 
+-          <h1 className="text-3xl font-semibold leading-tight tracking-tight   
+text-zinc-900 sm:text-4xl">                                                     
++          <h1 className="text-3xl leading-tight tracking-tight text-zinc-900   
+font-semibold sm:text-4xl">                                                     
+             Find a tutor. Book a slot. Show up ready.                          
+           </h1>                                                                
+           <p className="text-base leading-7 text-zinc-600">                    
+             Post an open slot if you tutor, or grab one before it&apos;s gone. 
+             No accounts, no back-and-forth — just real sessions from students  
+@@ -205,5 +219,6 @@                                                             
+           </p>                                                                 
+                                                                                
+         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[380px_1fr]">      
+           <section                                                             
+             aria-labelledby="post-listing-heading"                             
+-            className="h-fit space-y-6 rounded-xl border border-zinc-200       
+bg-white p-6 shadow-sm lg:sticky lg:top-8"                                      
++            className="h-fit space-y-6 rounded-xl border border-zinc-200       
+bg-white p-8 shadow-sm lg:sticky lg:top-8"                                      
+           >                                                                    
+-            <div className="space-y-1">                                        
++            <div className="space-y-2">                                        
+               <h2                                                              
+                 id="post-listing-heading"                                      
+                 className="text-lg font-semibold text-zinc-900"                
+               >                                                                
+                 Open a slot                                                    
+@@ -221,5 +235,6 @@                                                             
+                 Tutoring something? Post it here and students can book it      
+               </p>                                                             
+             </div>                                                             
+                                                                                
+             <form onSubmit={handleSubmit} className="space-y-4" noValidate>    
+-              <div className="space-y-1.5">                                    
++              <div className="space-y-2">                                      
+                 <label                                                         
+                   htmlFor="subject"                                            
+-                  className="block text-sm font-medium text-zinc-700"          
++                  className="block text-sm text-zinc-700"                      
+                 >                                                              
+                   Subject                                                      
+                 </label>                                                       
+                 <input                                                         
+                   id="subject"                                                 
+                   type="text"                                                  
+                   value={formState.subject}                                    
+                   onChange={(e) => updateField("subject", e.target.value)}     
+                   placeholder="Organic Chemistry, Calc II, Spanish…"           
+-                  className="w-full rounded-lg border border-zinc-200 bg-white 
+px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 transition            
+duration-150 focus:outline-none focus-visible:ring-2                            
+focus-visible:ring-indigo-500 focus-visible:ring-offset-1"                      
++                  className="w-full rounded-lg border border-zinc-200 bg-white 
+px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 transition            
+duration-150 focus:outline-none focus-visible:ring-2                            
+focus-visible:ring-indigo-500 focus-visible:ring-offset-1"                      
+                 />                                                             
+               </div>                                                           
+                                                                                
+-              <div className="space-y-1.5">                                    
++              <div className="space-y-2">                                      
+                 <label                                                         
+                   htmlFor="tutorName"                                          
+-                  className="block text-sm font-medium text-zinc-700"          
++                  className="block text-sm text-zinc-700"                      
+                 >                                                              
+                   Your name                                                    
+                 </label>                                                       
+                 <input                                                         
+                   id="tutorName"                                               
+                   type="text"                                                  
+                   value={formState.tutorName}                                  
+                   onChange={(e) => updateField("tutorName", e.target.value)}   
+                   placeholder="Jordan Lee"                                     
+-                  className="w-full rounded-lg border border-zinc-200 bg-white 
+px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 transition            
+duration-150 focus:outline-none focus-visible:ring-2                            
+focus-visible:ring-indigo-500 focus-visible:ring-offset-1"                      
++                  className="w-full rounded-lg border border-zinc-200 bg-white 
+px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 transition            
+duration-150 focus:outline-none focus-visible:ring-2                            
+focus-visible:ring-indigo-500 focus-visible:ring-offset-1"                      
+                 />                                                             
+               </div>                                                           
+                                                                                
+-              <div className="grid grid-cols-2 gap-3">                         
+-                <div className="space-y-1.5">                                  
++              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">          
++                <div className="space-y-2">                                    
+                   <label                                                       
+                     htmlFor="rate"                                             
+-                    className="block text-sm font-medium text-zinc-700"        
++                    className="block text-sm text-zinc-700"                    
+                   >                                                            
+                     Rate ($/hr)                                                
+                   </label>                                                     
+                   <input                                                       
+                     id="rate"                                                  
+@@ -272,5 +286,6 @@                                                             
+                     min={1}                                                    
+                     step={0.5}                                                 
+                     value={formState.rate}                                     
+                     onChange={(e) => updateField("rate", e.target.value)}      
+                     placeholder="25"                                           
+-                    className="w-full rounded-lg border border-zinc-200        
+bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 transition   
+duration-150 focus:outline-none focus-visible:ring-2                            
+focus-visible:ring-indigo-500 focus-visible:ring-offset-1"                      
++                    className="w-full rounded-lg border border-zinc-200        
+bg-white px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 transition   
+duration-150 focus:outline-none focus-visible:ring-2                            
+focus-visible:ring-indigo-500 focus-visible:ring-offset-1"                      
+                   />                                                           
+                 </div>                                                         
+-                <div className="space-y-1.5">                                  
++                <div className="space-y-2">                                    
+                   <label                                                       
+                     htmlFor="slot"                                             
+-                    className="block text-sm font-medium text-zinc-700"        
++                    className="block text-sm text-zinc-700"                    
+                   >                                                            
+                     Slot                                                       
+                   </label>                                                     
+                   <input                                                       
+                     id="slot"                                                  
+                     type="datetime-local"                                      
+                     min={nowForInput()}                                        
+                     value={formState.slot}                                     
+                     onChange={(e) => updateField("slot", e.target.value)}      
+-                    className="w-full rounded-lg border border-zinc-200        
+bg-white px-2 py-2 text-sm text-zinc-900 transition duration-150                
+focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500           
+focus-visible:ring-offset-1"                                                    
++                    className="w-full rounded-lg border border-zinc-200        
+bg-white px-4 py-3 text-sm text-zinc-900 transition duration-150                
+focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500           
+focus-visible:ring-offset-1"                                                    
+                   />                                                           
+                 </div>                                                         
+               </div>                                                           
+                                                                                
+-              <div className="space-y-1.5">                                    
++              <div className="space-y-2">                                      
+                 <label                                                         
+                   htmlFor="description"                                        
+-                  className="block text-sm font-medium text-zinc-700"          
++                  className="block text-sm text-zinc-700"                      
+                 >                                                              
+                   Notes{" "}                                                   
+-                  <span className="font-normal text-zinc-400">(optional)</span>
++                  <span className="text-zinc-400">(optional)</span>            
+                 </label>                                                       
+                 <textarea                                                      
+                   id="description"                                             
+                   rows={3}                                                     
+                   value={formState.description}                                
+                   onChange={(e) => updateField("description", e.target.value)} 
+                   placeholder="What you'll cover, format, materials to bring…" 
+-                  className="w-full resize-none rounded-lg border              
+border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-900              
+placeholder:text-zinc-400 transition duration-150 focus:outline-none            
+focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1" 
++                  className="w-full resize-none rounded-lg border              
+border-zinc-200 bg-white px-4 py-3 text-sm leading-6 text-zinc-900              
+placeholder:text-zinc-400 transition duration-150 focus:outline-none            
+focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1" 
+                 />                                                             
+               </div>                                                           
+                                                                                
+               {formError && (                                                  
+-                <p className="text-sm text-red-600">{formError}</p>            
++                <p role="alert" className="text-sm text-red-600">              
++                  {formError}                                                  
++                </p>                                                           
+               )}                                                               
+                                                                                
+               <button                                                          
+                 type="submit"                                                  
+                 disabled={submitting}                                          
+-                className="flex w-full items-center justify-center gap-2       
+rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition
+duration-150 hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2
+focus-visible:ring-indigo-500 focus-visible:ring-offset-2                       
+disabled:cursor-not-allowed disabled:opacity-60"                                
++                className="flex w-full items-center justify-center gap-2       
+rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition  
+duration-150 hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2
+focus-visible:ring-indigo-500 focus-visible:ring-offset-2                       
+disabled:cursor-not-allowed disabled:opacity-60"                                
+               >                                                                
+                 {submitting ? "Posting…" : "Post listing"}                     
+               </button>                                                        
+             </form>                                                            
+           </section>                                                           
+                                                                                
+               >                                                                
+               )}                                                               
+             </div>                                                             
+                                                                                
+             {actionError && (                                                  
+-              <div className="flex items-start justify-between gap-4 rounded-xl
+border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">                
++              <div                                                             
++                role="alert"                                                   
++                className="flex items-start justify-between gap-4 rounded-xl   
+border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"                 
++              >                                                                
+                 <p>{actionError}</p>                                           
+                 <button                                                        
+                   onClick={() => setActionError(null)}                         
+-                  className="shrink-0 font-semibold underline-offset-2         
+transition duration-150 hover:underline focus-visible:outline-none              
+focus-visible:ring-2 focus-visible:ring-red-500"                                
++                  className="shrink-0 underline-offset-2 transition            
+duration-150 hover:underline focus-visible:outline-none focus-visible:ring-2    
+focus-visible:ring-red-500"                                                     
+                 >                                                              
+                   Dismiss                                                      
+                 </button>                                                      
+               </div>                                                           
+             )}                                                                 
+                                                                                
+             {loading ? (                                                       
+-              <div className="space-y-4">                                      
++              <div role="status" aria-live="polite" className="space-y-4">     
++                <span className="sr-only">Loading open tutoring                
+sessions…</span>                                                                
+                 {[0, 1, 2].map((i) => (                                        
+                   <div                                                         
+                     key={i}                                                    
+-                    className="animate-pulse rounded-xl border border-zinc-200 
+bg-white p-5"                                                                   
++                    className="animate-pulse rounded-xl border border-zinc-200 
+bg-white p-6"                                                                   
+                   >                                                            
+                     <div className="h-4 w-1/3 rounded bg-zinc-200" />          
+                     <div className="mt-3 h-3 w-1/2 rounded bg-zinc-100" />     
+                     <div className="mt-6 h-3 w-full rounded bg-zinc-100" />    
+                     <div className="mt-2 h-3 w-2/3 rounded bg-zinc-100" />     
+                   </div>                                                       
+                 ))}                                                            
+               </div>                                                           
+             ) : loadError ? (                                                  
++              <div                                                             
+text-sm text-red-700">                                                          
+-                <p className="font-semibold">Couldn&apos;t load listings</p>   
++              <div                                                             
++                role="alert"                                                   
++                className="rounded-xl border border-red-200 bg-red-50 p-6      
+text-sm text-red-700"                                                           
++              >                                                                
++                <p className="font-semibold">Couldn&apos;t load open           
+sessions</p>                                                                    
+                 <p className="mt-1 leading-6">{loadError}</p>                  
+                 <button                                                        
+                   onClick={loadListings}                                       
+-                  className="mt-4 rounded-lg border border-red-300 px-3 py-1.5 
+text-sm font-semibold text-red-700 transition duration-150 hover:bg-red-100     
+focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"     
++                  className="mt-4 rounded-lg border border-red-300 px-4 py-2   
+text-sm text-red-700 transition duration-150 hover:bg-red-100                   
+focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"     
+                 >                                                              
+                   Try again                                                    
+                 </button>                                                      
+               </div>                                                           
+             ) : listings.length === 0 ? (                                      
+               <div className="rounded-xl border border-dashed border-zinc-300  
+                 <p className="text-base font-semibold text-zinc-900">          
+                   No sessions posted yet                                       
+                   const isBooked = listing.status === "booked";                
+                   return (                                                     
+                     <li key={listing.id}>                                      
+-                      <article className="rounded-xl border border-zinc-200    
+bg-white p-5 shadow-sm transition duration-150 hover:shadow-md">                
++                      <article className="rounded-xl border border-zinc-200    
+bg-white p-6 shadow-sm transition duration-150 hover:shadow-md">                
+                         <div className="flex items-start justify-between       
+gap-4">                                                                         
+                           <div className="min-w-0 space-y-1">                  
+                             <div className="flex flex-wrap items-center gap-2">
+                               <h3 className="truncate text-base font-semibold  
+text-zinc-900">                                                                 
+                                 {listing.subject}                              
+                               </h3>                                            
+                               {isBooked && (                                   
+-                                <span className="inline-flex items-center      
+rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">        
++                                <span className="inline-flex items-center      
+rounded-full bg-zinc-100 px-2 py-1 text-xs text-zinc-600">                      
+                                   Booked                                       
+                                 </span>                                        
+                               )}                                               
+                             </div>                                             
+                             <p className="text-sm text-zinc-500">              
+                               with {listing.tutorName} ·{" "}                  
+                           </div>                                               
+                             aria-label={`Delete ${listing.subject} listing`}   
+                             className="shrink-0 rounded-lg p-2 text-zinc-400   
+transition duration-150 hover:bg-zinc-50 hover:text-red-600                     
+                         {listing.description && (                              
+-                          <p className="mt-3 text-sm leading-6 text-zinc-600"> 
++                          <p className="mt-4 text-sm leading-6 text-zinc-600"> 
+                             {listing.description}                              
+                           </p>                                                 
+                         )}                                                     
+                                                                                
+-                        <div className="mt-4 flex items-center justify-between 
+border-t border-zinc-100 pt-4">                                                 
++                        <div className="mt-6 flex items-center justify-between 
+border-t border-zinc-100 pt-6">                                                 
+                           <p className="text-sm font-semibold text-zinc-900">  
+                             ${listing.rate.toFixed(2)}                         
+-                            <span className="font-normal text-zinc-500">       
+-                              /hr                                              
+-                            </span>                                            
++                            <span className="text-zinc-500">/hr</span>         
+                           </p>                                                 
+                           <button                                              
+                             onClick={() => handleBook(listing.id)}             
+                             disabled={isBooked || isPending}                   
+-                            className="rounded-lg border border-indigo-600 px-3
+py-1.5 text-sm font-semibold text-indigo-600 transition duration-150            
+hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2              
+focus-visible:ring-indigo-500 disabled:cursor-not-allowed                       
+disabled:border-zinc-200 disabled:text-zinc-400 disabled:hover:bg-transparent"  
++                            className="rounded-lg border border-indigo-600 px-4
+py-2 text-sm text-indigo-600 transition duration-150 hover:bg-indigo-50         
+focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500   
+disabled:cursor-not-allowed disabled:border-zinc-200 disabled:text-zinc-400     
+disabled:hover:bg-transparent"                                                  
+                           >                                                    
+                             {isBooked                                          
+                               ? "Slot taken"                                   
+                               : isPending                                      
+                               ? "Booking…"                                     
+                                                                                
+
+a-campus-tutoring-marketplace-post-a-lis-7w596/app/page.tsx                     
+
+                                                                                
+@@ -5,5 +5,6 @@                                                                 
+                                                                                
+     try {                                                                      
+       const res = await fetch("/api/items", { cache: "no-store" });            
+       const data = await res.json();                                           
+       if (!res.ok) {                                                           
+-        throw new Error(data.error || "Couldn't load listings.");              
++        throw new Error(                                                       
++          data.error || "The listings service didn't respond. Give it another  
+try."                                                                           
++        );                                                                     
+       }                                                                        
+       setListings(data.listings as Listing[]);                                 
+     } catch (err) {                                                            
+       setLoadError(                                                            
+-        err instanceof Error ? err.message : "Couldn't load listings."         
++        err instanceof Error                                                   
++          ? err.message                                                        
++          : "We couldn't reach the listings service. Check your connection and 
+try again."                                                                     
+       );                                                                       
+     } finally {                                                                
+       setLoading(false);                                                       
+     }                                                                          
+   }, []);                                                                      
+@@ -87,5 +91,6 @@                                                               
+   useEffect(() => {                                                            
+     loadListings();                                                            
+       });                                                                      
+       const data = await res.json();                                           
+       if (!res.ok) {                                                           
+-        throw new Error(data.error || "Something went wrong.");                
++        throw new Error(data.error || "We couldn't post that slot. Try         
+again.");                                                                       
+       }                                                                        
+       setListings((prev) => [data.listing as Listing, ...prev]);               
+       setFormState(EMPTY_FORM);                                                
+     } catch (err) {                                                            
+-      setFormError(err instanceof Error ? err.message : "Something went        
+wrong.");                                                                       
+-    } finally {                                                                
+-      setSubmitting(false);                                                    
+-    }                                                                          
+-  }                                                                            
+-                                                                               
+-  async function handleBook(id: string) {                                      
+-    setActionError(null);                                                      
+-    setPendingIds((prev) => new Set(prev).add(id));                            
+-    try {                                                                      
+-      const res = await fetch(`/api/items?id=${id}`, {                         
+-        method: "PATCH",                                                       
+-        headers: { "Content-Type": "application/json" },                       
+-        body: JSON.stringify({ status: "booked" }),                            
+-      });                                                                      
+-      const data = await res.json();                                           
+-      if (!res.ok) {                                                           
+-        throw new Error(data.error || "Could not book this slot.");            
+-      }                                                                        
+-      setListings((prev) =>                                                    
+-        prev.map((item) => (item.id === id ? (data.listing as Listing) : item))
+-      );                                                                       
+-    } catch (err) {                                                            
+-      setActionError(                                                          
+-        err instanceof Error ? err.message : "Could not book this slot."       
++      setFormError(                                                            
+       setActionError(                                                          
+-        err instanceof Error ? err.message : "Could not book this slot."       
++        err instanceof Error                                                   
++          ? err.message                                                        
++          : "Someone may have just booked this slot. Refresh to see what's     
+open."                                                                          
+       );                                                                       
+     } finally {                                                                
+       setPendingIds((prev) => {                                                
+         const next = new Set(prev);                                            
+         next.delete(id);                                                       
+         return next;                                                           
+     setPendingIds((prev) => new Set(prev).add(id));                            
+     try {                                                                      
+       const res = await fetch(`/api/items?id=${id}`, { method: "DELETE" });    
+       if (!res.ok) {                                                           
+         const data = await res.json();                                         
+-        throw new Error(data.error || "Could not delete this listing.");       
++        throw new Error(                                                       
++          data.error || "That listing may have already been removed."          
++        );                                                                     
+       }                                                                        
+       setListings((prev) => prev.filter((item) => item.id !== id));            
+     } catch (err) {                                                            
+       setActionError(                                                          
+-        err instanceof Error ? err.message : "Could not delete this listing."  
++        err instanceof Error                                                   
++          ? err.message                                                        
++          : "That listing may have already been removed."                      
+       );                                                                       
+     } finally {                                                                
+       setPendingIds((prev) => {                                                
+         const next = new Set(prev);                                            
+         next.delete(id);                                                       
+@@ -188,5 +202,8 @@                                                             
+     }                                                                          
+   }                                                                            
+                                                                                
+   return (                                                                     
+     <div className="min-h-screen bg-zinc-50">                                  
+-      <div className="mx-auto max-w-6xl px-6 py-12 sm:px-8 lg:px-10 lg:py-16"> 
+-        <header className="mb-12 max-w-2xl space-y-3">                         
++      <div className="mx-auto max-w-6xl px-6 py-12 sm:px-8 lg:px-12 lg:py-20"> 
++        <header className="mb-16 max-w-2xl space-y-4">                         
+           <p className="text-sm font-semibold uppercase tracking-wide          
+text-indigo-600">                                                               
+             Campus Tutoring                                                    
+           </p>                                                                 
+-          <h1 className="text-3xl font-semibold leading-tight tracking-tight   
+text-zinc-900 sm:text-4xl">                                                     
++          <h1 className="text-3xl leading-tight tracking-tight text-zinc-900   
+font-semibold sm:text-4xl">                                                     
+             Find a tutor. Book a slot. Show up ready.                          
+           </h1>                                                                
+           <p className="text-base leading-7 text-zinc-600">                    
+             Post an open slot if you tutor, or grab one before it&apos;s gone. 
+             No accounts, no back-and-forth — just real sessions from students  
+             on your campus.                                                    
+         </header>                                                              
+                                                                                
+         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[380px_1fr]">      
+           <section                                                             
+             aria-labelledby="post-listing-heading"                             
+-            className="h-fit space-y-6 rounded-xl border border-zinc-200       
+bg-white p-6 shadow-sm lg:sticky lg:top-8"                                      
++            className="h-fit space-y-6 rounded-xl border border-zinc-200       
+bg-white p-8 shadow-sm lg:sticky lg:top-8"                                      
+           >                                                                    
+-            <div className="space-y-1">                                        
++            <div className="space-y-2">                                        
+               <h2                                                              
+                 id="post-listing-heading"                                      
+                 className="text-lg font-semibold text-zinc-900"                
+               >                                                                
+                 Open a slot                                                    
+@@ -222,7 +236,8 @@                                                             
+                 directly.                                                      
+               </p>                                                             
+             </div>                                                             
+                                                                                
+             <form onSubmit={handleSubmit} className="space-y-4" noValidate>    
+-              <div className="space-y-1.5">                                    
++              <div className="space-y-2">                                      
+                 <label                                                         
+                   htmlFor="subject"                                            
+-                  className="block text-sm font-medium text-zinc-700"          
++                  className="block text-sm text-zinc-700"                      
+                 >                                                              
+                   Subject                                                      
+                 </label>                                                       
+                 <input                                                         
+                   id="subject"                                                 
+                   type="text"                                                  
+                   value={formState.subject}                                    
+                   onChange={(e) => updateField("subject", e.target.value)}     
+                   placeholder="Organic Chemistry, Calc II, Spanish…"           
+-                  className="w-full rounded-lg border border-zinc-200 bg-white 
+px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 transition            
+duration-150 focus:outline-none focus-visible:ring-2                            
+focus-visible:ring-indigo-500 focus-visible:ring-offset-1"                      
++                  className="w-full rounded-lg border border-zinc-200 bg-white 
+px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 transition            
+duration-150 focus:outline-none focus-visible:ring-2                            
+focus-visible:ring-indigo-500 focus-visible:ring-offset-1"                      
+                 />                                                             
+               </div>                                                           
+                                                                                
+-              <div className="space-y-1.5">                                    
++              <div className="space-y-2">                                      
+                 <label                                                         
+                   htmlFor="tutorName"                                          
+-                  className="block text-sm font-medium text-zinc-700"          
++                  className="block text-sm text-zinc-700"                      
+                 >                                                              
+                   Your name                                                    
+                 </label>                                                       
+                 <input                                                         
+                   id="tutorName"                                               
+                   type="text"                                                  
+                   value={formState.tutorName}                                  
+                   onChange={(e) => updateField("tutorName", e.target.value)}   
+                   placeholder="Jordan Lee"                                     
+-                  className="w-full rounded-lg border border-zinc-200 bg-white 
+px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 transition            
+duration-150 focus:outline-none focus-visible:ring-2                            
+focus-visible:ring-indigo-500 focus-visible:ring-offset-1"                      
++                  className="w-full rounded-lg border border-zinc-200 bg-white 
+px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 transition            
+duration-150 focus:outline-none focus-visible:ring-2                            
+focus-visible:ring-indigo-500 focus-visible:ring-offset-1"                      
+                 />                                                             
+               </div>                                                           
+                                                                                
+-              <div className="grid grid-cols-2 gap-3">                         
+-                <div className="space-y-1.5">                                  
++              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">          
++                <div className="space-y-2">                                    
+                   <label                                                       
+                     htmlFor="rate"                                             
+-                    className="block text-sm font-medium text-zinc-700"        
++                    className="block text-sm text-zinc-700"                    
+                   >                                                            
+                     Rate ($/hr)                                                
+                   </label>                                                     
+                   <input                                                       
+                     id="rate"                                                  
+@@ -272,5 +286,6 @@                                                             
+                     min={1}                                                    
+                     step={0.5}                                                 
+                     value={formState.rate}                                     
+                     onChange={(e) => updateField("rate", e.target.value)}      
+                     placeholder="25"                                           
+-                    className="w-full rounded-lg border border-zinc-200        
+bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 transition   
+duration-150 focus:outline-none focus-visible:ring-2                            
+focus-visible:ring-indigo-500 focus-visible:ring-offset-1"                      
++                    className="w-full rounded-lg border border-zinc-200        
+bg-white px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 transition   
+duration-150 focus:outline-none focus-visible:ring-2                            
+focus-visible:ring-indigo-500 focus-visible:ring-offset-1"                      
+                   />                                                           
+                 </div>                                                         
+-                <div className="space-y-1.5">                                  
++                <div className="space-y-2">                                    
+                   <label                                                       
+                     htmlFor="slot"                                             
+-                    className="block text-sm font-medium text-zinc-700"        
++                    className="block text-sm text-zinc-700"                    
+                   >                                                            
+                     Slot                                                       
+                   </label>                                                     
+                   <input                                                       
+                     id="slot"                                                  
+                     type="datetime-local"                                      
+                     min={nowForInput()}                                        
+                     value={formState.slot}                                     
+                     onChange={(e) => updateField("slot", e.target.value)}      
+-                    className="w-full rounded-lg border border-zinc-200        
+bg-white px-2 py-2 text-sm text-zinc-900 transition duration-150                
+focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500           
+focus-visible:ring-offset-1"                                                    
++                    className="w-full rounded-lg border border-zinc-200        
+bg-white px-4 py-3 text-sm text-zinc-900 transition duration-150                
+focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500           
+focus-visible:ring-offset-1"                                                    
+                   />                                                           
+                 </div>                                                         
+               </div>                                                           
+                                                                                
+-              <div className="space-y-1.5">                                    
++              <div className="space-y-2">                                      
+                 <label                                                         
+                   htmlFor="description"                                        
+-                  className="block text-sm font-medium text-zinc-700"          
++                  className="block text-sm text-zinc-700"                      
+                 >                                                              
+                   Notes{" "}                                                   
+-                  <span className="font-normal text-zinc-400">(optional)</span>
++                  <span className="text-zinc-400">(optional)</span>            
+                 </label>                                                       
+                 <textarea                                                      
+                   id="description"                                             
+                   rows={3}                                                     
+                   value={formState.description}                                
+                   onChange={(e) => updateField("description", e.target.value)} 
+                   placeholder="What you'll cover, format, materials to bring…" 
+-                  className="w-full resize-none rounded-lg border              
+border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-900              
+placeholder:text-zinc-400 transition duration-150 focus:outline-none            
+focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1" 
++                  className="w-full resize-none rounded-lg border              
+border-zinc-200 bg-white px-4 py-3 text-sm leading-6 text-zinc-900              
+placeholder:text-zinc-400 transition duration-150 focus:outline-none            
+focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1" 
+                 />                                                             
+               </div>                                                           
+                                                                                
+               {formError && (                                                  
+-                <p className="text-sm text-red-600">{formError}</p>            
++                <p role="alert" className="text-sm text-red-600">              
++                  {formError}                                                  
++                </p>                                                           
+               )}                                                               
+                                                                                
+               <button                                                          
+                 type="submit"                                                  
+                 disabled={submitting}                                          
+-                className="flex w-full items-center justify-center gap-2       
+rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition
+duration-150 hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2
+focus-visible:ring-indigo-500 focus-visible:ring-offset-2                       
+disabled:cursor-not-allowed disabled:opacity-60"                                
++                className="flex w-full items-center justify-center gap-2       
+rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition  
+duration-150 hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2
+focus-visible:ring-indigo-500 focus-visible:ring-offset-2                       
+disabled:cursor-not-allowed disabled:opacity-60"                                
+               >                                                                
+                 {submitting ? "Posting…" : "Post listing"}                     
+               </button>                                                        
+             </form>                                                            
+           </section>                                                           
+@@ -337,5 +353,6 @@                                                             
+               </h2>                                                            
+               )}                                                               
+             </div>                                                             
+                                                                                
+             {actionError && (                                                  
+-              <div className="flex items-start justify-between gap-4 rounded-xl
+border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">                
++              <div                                                             
++                role="alert"                                                   
++                className="flex items-start justify-between gap-4 rounded-xl   
+border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"                 
++              >                                                                
+                 <p>{actionError}</p>                                           
+                 <button                                                        
+                   onClick={() => setActionError(null)}                         
+-                  className="shrink-0 font-semibold underline-offset-2         
+transition duration-150 hover:underline focus-visible:outline-none              
+focus-visible:ring-2 focus-visible:ring-red-500"                                
++                  className="shrink-0 underline-offset-2 transition            
+duration-150 hover:underline focus-visible:outline-none focus-visible:ring-2    
+focus-visible:ring-red-500"                                                     
+                 >                                                              
+                   Dismiss                                                      
+                 </button>                                                      
+               </div>                                                           
+             )}                                                                 
+                                                                                
+             {loading ? (                                                       
+-              <div className="space-y-4">                                      
++              <div role="status" aria-live="polite" className="space-y-4">     
++                <span className="sr-only">Loading open tutoring                
+sessions…</span>                                                                
+                 {[0, 1, 2].map((i) => (                                        
+                   <div                                                         
+                     key={i}                                                    
+-                    className="animate-pulse rounded-xl border border-zinc-200 
+bg-white p-5"                                                                   
++                    className="animate-pulse rounded-xl border border-zinc-200 
+bg-white p-6"                                                                   
+                   >                                                            
+                     <div className="h-4 w-1/3 rounded bg-zinc-200" />          
+                     <div className="mt-3 h-3 w-1/2 rounded bg-zinc-100" />     
+                     <div className="mt-6 h-3 w-full rounded bg-zinc-100" />    
+                     <div className="mt-2 h-3 w-2/3 rounded bg-zinc-100" />     
+                   </div>                                                       
+                 ))}                                                            
+               </div>                                                           
+             ) : loadError ? (                                                  
+-              <div className="rounded-xl border border-red-200 bg-red-50 p-6   
+text-sm text-red-700">                                                          
+-                <p className="font-semibold">Couldn&apos;t load listings</p>   
++              <div                                                             
++                role="alert"                                                   
++                className="rounded-xl border border-red-200 bg-red-50 p-6      
+text-sm text-red-700"                                                           
++              >                                                                
++                <p className="font-semibold">Couldn&apos;t load open           
+sessions</p>                                                                    
+                 <p className="mt-1 leading-6">{loadError}</p>                  
+                 <button                                                        
+                   onClick={loadListings}                                       
+-                  className="mt-4 rounded-lg border border-red-300 px-3 py-1.5 
+text-sm font-semibold text-red-700 transition duration-150 hover:bg-red-100     
+focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"     
++                  className="mt-4 rounded-lg border border-red-300 px-4 py-2   
+text-sm text-red-700 transition duration-150 hover:bg-red-100                   
+focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"     
+                 >                                                              
+                   Try again                                                    
+                 </button>                                                      
+               </div>                                                           
+             ) : listings.length === 0 ? (                                      
+               <div className="rounded-xl border border-dashed border-zinc-300  
+bg-white px-6 py-16 text-center">                                               
+                 <p className="text-base font-semibold text-zinc-900">          
+                   const isBooked = listing.status === "booked";                
+                   return (                                                     
+                     <li key={listing.id}>                                      
+-                      <article className="rounded-xl border border-zinc-200    
+bg-white p-5 shadow-sm transition duration-150 hover:shadow-md">                
++                      <article className="rounded-xl border border-zinc-200    
+bg-white p-6 shadow-sm transition duration-150 hover:shadow-md">                
+                         <div className="flex items-start justify-between       
+gap-4">                                                                         
+                           <div className="min-w-0 space-y-1">                  
+                             <div className="flex flex-wrap items-center gap-2">
+                               <h3 className="truncate text-base font-semibold  
+text-zinc-900">                                                                 
+                                 {listing.subject}                              
+                               </h3>                                            
+                               {isBooked && (                                   
+-                                <span className="inline-flex items-center      
+rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">        
++                                <span className="inline-flex items-center      
+rounded-full bg-zinc-100 px-2 py-1 text-xs text-zinc-600">                      
+                                   Booked                                       
+                                 </span>                                        
+                               )}                                               
+                             </div>                                             
+                             <p className="text-sm text-zinc-500">              
+@@ -417,5 +440,6 @@                                                             
+                           </div>                                               
+                             aria-label={`Delete ${listing.subject} listing`}   
+                             className="shrink-0 rounded-lg p-2 text-zinc-400   
+transition duration-150 hover:bg-zinc-50 hover:text-red-600                     
+                         {listing.description && (                              
+-                          <p className="mt-3 text-sm leading-6 text-zinc-600"> 
++                          <p className="mt-4 text-sm leading-6 text-zinc-600"> 
+                             {listing.description}                              
+                           </p>                                                 
+                         )}                                                     
+                                                                                
+-                        <div className="mt-4 flex items-center justify-between 
+border-t border-zinc-100 pt-4">                                                 
++                        <div className="mt-6 flex items-center justify-between 
+border-t border-zinc-100 pt-6">                                                 
+                           <p className="text-sm font-semibold text-zinc-900">  
+                             ${listing.rate.toFixed(2)}                         
+-                            <span className="font-normal text-zinc-500">       
+-                              /hr                                              
+-                            </span>                                            
++                            <span className="text-zinc-500">/hr</span>         
+                           </p>                                                 
+                           <button                                              
+                             onClick={() => handleBook(listing.id)}             
+                             disabled={isBooked || isPending}                   
+-                            className="rounded-lg border border-indigo-600 px-3
+py-1.5 text-sm font-semibold text-indigo-600 transition duration-150            
+hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2              
+focus-visible:ring-indigo-500 disabled:cursor-not-allowed                       
+disabled:border-zinc-200 disabled:text-zinc-400 disabled:hover:bg-transparent"  
++                            className="rounded-lg border border-indigo-600 px-4
+py-2 text-sm text-indigo-600 transition duration-150 hover:bg-indigo-50         
+focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500   
+disabled:cursor-not-allowed disabled:border-zinc-200 disabled:text-zinc-400     
+disabled:hover:bg-transparent"                                                  
+                           >                                                    
+                             {isBooked                                          
+                               ? "Slot taken"                                   
+                               : isPending                                      
+                               ? "Booking…"                                     
+                                                                                
+
+Tokens: 12k sent, 9.0k received. Cost: $0.11 message, $0.11 session.
+Applied edit to a-campus-tutoring-marketplace-post-a-lis-7w596/app/page.tsx
+Applied edit to app/page.tsx
+Commit db74856 style: enforce spacing rhythm, weight budget, and a11y states
+Summarization failed for model anthropic/claude-sonnet-5: cannot schedule new futures after shutdown
+Summarization failed for model anthropic/claude-sonnet-5: cannot schedule new futures after shutdown
+summarizer unexpectedly failed for all models
