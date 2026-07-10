@@ -1,0 +1,134 @@
+name: build-fullstack
+on:
+  push:
+    branches: ["main"]
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Scaffold Next.js (App Router + API routes)
+        run: npx --yes create-next-app@latest "${{ github.event.repository.name }}" --ts --app --no-eslint --use-npm --tailwind --no-src-dir --import-alias "@/*" --yes
+      - name: Relax the build to transpile-only (agent code must RUN, not pass strict lint/types)
+        working-directory: ${{ github.event.repository.name }}
+        run: |
+          printf 'const nextConfig = { eslint: { ignoreDuringBuilds: true }, typescript: { ignoreBuildErrors: true } };\nexport default nextConfig;\n' > next.config.ts
+      - name: Install Aider
+        run: python -m pip install --upgrade pip && pip install aider-chat
+      - name: Implement + self-repair until it builds (free model)
+        working-directory: ${{ github.event.repository.name }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: |
+          set +e
+          # Claude Sonnet 5 REJECTS the 'temperature' param litellm sends by default → without this, EVERY
+          # Aider edit fails with a 400 (invalid_request_error) and nothing is implemented. A model-settings
+          # file with use_temperature:false tells Aider to omit it.
+          SETTINGS="$GITHUB_WORKSPACE/aider.settings.yml"
+          printf '%s\n' "- name: anthropic/claude-sonnet-5" "  use_temperature: false" "  edit_format: whole" > "$SETTINGS"
+          # SCAFFOLD = the app is still the untouched Next.js starter (the agent didn't implement the feature).
+          SCAFFOLD() { grep -qiE "edit the page.tsx|To get started, edit|Get started by editing" app/page.tsx; }
+          aider --yes --model anthropic/claude-sonnet-5 --model-settings-file "$SETTINGS" --message-file ../PROMPT.md app/page.tsx app/api/items/route.ts 2>&1 | tee -a ../aider.log
+          for i in 1 2 3 4; do
+            if npm run build > ../build.log 2>&1; then
+              # A clean build is NOT enough — the default starter also builds. Require the REAL feature.
+              if ! SCAFFOLD; then echo "build passed + real feature implemented (attempt $i)"; exit 0; fi
+              echo "builds, but app/page.tsx is STILL the default scaffold — forcing a real implementation (attempt $i)"
+              aider --yes --model anthropic/claude-sonnet-5 --model-settings-file "$SETTINGS" --message "You left the DEFAULT Next.js starter in app/page.tsx. Replace it ENTIRELY with the real, working UI for the product described in PROMPT.md, and implement a real GET+POST handler in app/api/items/route.ts. No starter boilerplate, no 'get started by editing' text." app/page.tsx app/api/items/route.ts 2>&1 | tee -a ../aider.log
+              continue
+            fi
+            echo "build failed (attempt $i) — feeding the error back to the agent to self-repair"
+            ERR=$(tail -60 ../build.log)
+            aider --yes --model anthropic/claude-sonnet-5 --model-settings-file "$SETTINGS" --message "The Next.js production build failed. Fix ALL build, type, and lint errors so 'npm run build' passes cleanly. Do not remove features. Build output:
+          $ERR" app/page.tsx app/api/items/route.ts 2>&1 | tee -a ../aider.log
+          done
+          # Honest final gate: NEVER ship the blank starter as "the product". If it still builds only as the
+          # scaffold (or won't build), FAIL — deploy-url stays empty, and the product stays honestly "building".
+          if npm run build > ../build.log 2>&1 && ! SCAFFOLD; then echo "final gate: real feature present"; exit 0; fi
+          echo "agent could not produce a REAL feature (still scaffold / not building) — failing honestly, no blank deploy"; exit 1
+      - name: Design-Lead review — the craft gate (Phase 7; grade the UI, close every gap)
+        working-directory: ${{ github.event.repository.name }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: |
+          set +e
+          SETTINGS="$GITHUB_WORKSPACE/aider.settings.yml"
+          printf '%s\n' "- name: anthropic/claude-sonnet-5" "  use_temperature: false" "  edit_format: whole" > "$SETTINGS"
+          # Snapshot the KNOWN-GOOD state first — the review pass can improve the app but NEVER break it.
+          # Aider auto-commits its edits, so pin the snapshot SHA and hard-reset to IT on failure (a bare
+          # reset to HEAD would keep the broken review commit).
+          git config user.name "competitor-bot" && git config user.email "actions@users.noreply.github.com"
+          git add -A && git commit -m "wip: pre-design-review snapshot [skip ci]" > /dev/null 2>&1 || true
+          SNAP=$(git rev-parse HEAD)
+          aider --yes --model anthropic/claude-sonnet-5 --model-settings-file "$SETTINGS" --message "You are the DESIGN LEAD doing the final review of app/page.tsx before it ships to a paying customer. Grade it hard against this rubric, then EDIT the code to close every gap (or leave it untouched if it already meets the bar): (1) real type hierarchy — one confident heading, muted secondary text, tight tracking on large type, two weights max; (2) 8px spacing rhythm and generous whitespace; (3) restraint — neutral base + exactly ONE accent color on the primary action; (4) subtle depth — hairline borders, rounded-xl, no gradients/neon/emoji-as-UI; (5) purposeful hover/focus/transition states; (6) REAL empty, loading, and error states with product-specific copy; (7) visible focus-visible rings + mobile-first responsive; (8) specific microcopy for THIS product, no placeholder text. Keep all functionality working — do not remove or rename the API calls." app/page.tsx app/globals.css 2>&1 | tee -a ../aider.log
+          if npm run build > ../build.log 2>&1; then
+            echo "design review pass: build still green — shipping the reviewed UI"
+          else
+            echo "design review broke the build — reverting to the pre-review snapshot (never ship broken)"
+            git reset --hard "$SNAP" > /dev/null 2>&1
+            git clean -fd app > /dev/null 2>&1
+            npm run build > ../build.log 2>&1 || { echo "revert failed to build — impossible state, failing honestly"; exit 1; }
+          fi
+      - name: Deploy to Vercel + make it public
+        working-directory: ${{ github.event.repository.name }}
+        env:
+          VT: ${{ secrets.VERCEL_TOKEN }}
+          PROJECT: ${{ github.event.repository.name }}
+        run: |
+          npm i -g vercel
+          URL=$(vercel deploy --prod --yes --token "$VT" 2>&1 | grep -oE "https://[a-z0-9.-]+.vercel.app" | tail -1)
+          echo "deployed: $URL"
+          echo "$URL" > ../deploy-url.txt
+          # Disable Vercel Deployment Protection so the app is publicly viewable (no SSO wall) — automatically.
+          TEAM=$(curl -s -H "Authorization: Bearer $VT" "https://api.vercel.com/v2/teams" | python3 -c "import sys,json;t=(json.load(sys.stdin).get('teams') or []);print(t[0]['id'] if t else '')" 2>/dev/null || echo "")
+          Q=""; [ -n "$TEAM" ] && Q="?teamId=$TEAM"
+          curl -s -X PATCH "https://api.vercel.com/v9/projects/$PROJECT$Q" -H "Authorization: Bearer $VT" -H "Content-Type: application/json" -d '{"ssoProtection":null}' > /dev/null 2>&1 || true
+      - name: Functional smoke — the app must RESPOND at runtime, not just build (Phase 5)
+        working-directory: ${{ github.event.repository.name }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.LLM_API_KEY }}
+          VT: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          URL=$(cat ../deploy-url.txt 2>/dev/null)
+          if [ -z "$URL" ]; then echo "no deploy url — skipping smoke"; exit 0; fi
+          # Same Aider temperature fix as the implement step (Claude Sonnet 5 rejects the 'temperature' param).
+          SETTINGS="$GITHUB_WORKSPACE/aider.settings.yml"
+          printf '%s\n' "- name: anthropic/claude-sonnet-5" "  use_temperature: false" "  edit_format: whole" > "$SETTINGS"
+          # A REAL serve = HTTP 200 AND a body AND NOT the Next.js starter page. Sets SMOKE_CODE. $1 = url.
+          SERVES_REAL() {
+            SMOKE_CODE=$(curl -s -o /tmp/smoke.html -w "%{http_code}" "$1" 2>/dev/null || echo "000")
+            [ "$SMOKE_CODE" = "200" ] && grep -qi "<body" /tmp/smoke.html && ! grep -qiE "get started by editing|to get started, edit|edit the page.tsx" /tmp/smoke.html
+          }
+          sleep 25
+          if SERVES_REAL "$URL"; then
+            echo "runtime smoke OK: $URL -> HTTP $SMOKE_CODE (real page, not the starter)"
+          else
+            echo "the deployed app does NOT serve a real page (HTTP $SMOKE_CODE / empty / still the starter) — one functional repair pass"
+            ERR=$(head -c 800 /tmp/smoke.html)
+            aider --yes --model anthropic/claude-sonnet-5 --model-settings-file "$SETTINGS" --message "The DEPLOYED app at runtime returned HTTP $SMOKE_CODE, empty HTML, or is STILL the default Next.js starter. Implement the REAL homepage for the product in PROMPT.md plus a working GET+POST /api/items — no starter boilerplate, no 'get started by editing' text. Response start: $ERR" app/page.tsx app/api/items/route.ts 2>&1 | tee -a ../aider.log
+            npm run build || true
+            URL2=$(vercel deploy --prod --yes --token "$VT" 2>&1 | grep -oE "https://[a-z0-9.-]+.vercel.app" | tail -1)
+            [ -n "$URL2" ] && echo "$URL2" > ../deploy-url.txt
+            sleep 20
+            SERVES_REAL "$(cat ../deploy-url.txt)" && echo "post-repair smoke OK (HTTP $SMOKE_CODE)" || echo "post-repair runtime smoke still failing (HTTP $SMOKE_CODE)"
+          fi
+          # Only publish a deploy-url the app actually SERVES as a REAL page — else blank it so we never surface a
+          # dead OR blank-scaffold link (the honesty floor: no proof we can't stand behind).
+          echo "$SMOKE_CODE" > ../smoke-code.txt
+          SERVES_REAL "$(cat ../deploy-url.txt 2>/dev/null)" || { echo "runtime not a real page — withholding the URL (honest: no dead/blank link)"; : > ../deploy-url.txt; }
+      - name: Commit source + deploy URL
+        if: always()
+        run: |
+          git config user.name "competitor-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "build: full-stack app from prompt [skip ci]" || echo "nothing to commit"
+          git push
