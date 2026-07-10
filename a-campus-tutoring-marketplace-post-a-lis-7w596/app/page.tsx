@@ -72,12 +72,16 @@ export default function Home() {
       const res = await fetch("/api/items", { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Couldn't load listings.");
+        throw new Error(
+          data.error || "The listings service didn't respond. Give it another try."
+        );
       }
       setListings(data.listings as Listing[]);
     } catch (err) {
       setLoadError(
-        err instanceof Error ? err.message : "Couldn't load listings."
+        err instanceof Error
+          ? err.message
+          : "We couldn't reach the listings service. Check your connection and try again."
       );
     } finally {
       setLoading(false);
@@ -125,12 +129,14 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Something went wrong.");
+        throw new Error(data.error || "We couldn't post that slot. Try again.");
       }
       setListings((prev) => [data.listing as Listing, ...prev]);
       setFormState(EMPTY_FORM);
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Something went wrong.");
+      setFormError(
+        err instanceof Error ? err.message : "We couldn't post that slot. Try again."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -147,14 +153,18 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Could not book this slot.");
+        throw new Error(
+          data.error || "Someone may have just booked this slot. Refresh to see what's open."
+        );
       }
       setListings((prev) =>
         prev.map((item) => (item.id === id ? (data.listing as Listing) : item))
       );
     } catch (err) {
       setActionError(
-        err instanceof Error ? err.message : "Could not book this slot."
+        err instanceof Error
+          ? err.message
+          : "Someone may have just booked this slot. Refresh to see what's open."
       );
     } finally {
       setPendingIds((prev) => {
@@ -172,12 +182,16 @@ export default function Home() {
       const res = await fetch(`/api/items?id=${id}`, { method: "DELETE" });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Could not delete this listing.");
+        throw new Error(
+          data.error || "That listing may have already been removed."
+        );
       }
       setListings((prev) => prev.filter((item) => item.id !== id));
     } catch (err) {
       setActionError(
-        err instanceof Error ? err.message : "Could not delete this listing."
+        err instanceof Error
+          ? err.message
+          : "That listing may have already been removed."
       );
     } finally {
       setPendingIds((prev) => {
@@ -190,12 +204,12 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-zinc-50">
-      <div className="mx-auto max-w-6xl px-6 py-12 sm:px-8 lg:px-10 lg:py-16">
-        <header className="mb-12 max-w-2xl space-y-3">
+      <div className="mx-auto max-w-6xl px-6 py-12 sm:px-8 lg:px-12 lg:py-20">
+        <header className="mb-16 max-w-2xl space-y-4">
           <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
             Campus Tutoring
           </p>
-          <h1 className="text-3xl font-semibold leading-tight tracking-tight text-zinc-900 sm:text-4xl">
+          <h1 className="text-3xl leading-tight tracking-tight text-zinc-900 font-semibold sm:text-4xl">
             Find a tutor. Book a slot. Show up ready.
           </h1>
           <p className="text-base leading-7 text-zinc-600">
@@ -208,9 +222,9 @@ export default function Home() {
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[380px_1fr]">
           <section
             aria-labelledby="post-listing-heading"
-            className="h-fit space-y-6 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm lg:sticky lg:top-8"
+            className="h-fit space-y-6 rounded-xl border border-zinc-200 bg-white p-8 shadow-sm lg:sticky lg:top-8"
           >
-            <div className="space-y-1">
+            <div className="space-y-2">
               <h2
                 id="post-listing-heading"
                 className="text-lg font-semibold text-zinc-900"
@@ -224,10 +238,10 @@ export default function Home() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <label
                   htmlFor="subject"
-                  className="block text-sm font-medium text-zinc-700"
+                  className="block text-sm text-zinc-700"
                 >
                   Subject
                 </label>
@@ -237,14 +251,14 @@ export default function Home() {
                   value={formState.subject}
                   onChange={(e) => updateField("subject", e.target.value)}
                   placeholder="Organic Chemistry, Calc II, Spanish…"
-                  className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
+                  className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
                 />
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <label
                   htmlFor="tutorName"
-                  className="block text-sm font-medium text-zinc-700"
+                  className="block text-sm text-zinc-700"
                 >
                   Your name
                 </label>
@@ -254,15 +268,15 @@ export default function Home() {
                   value={formState.tutorName}
                   onChange={(e) => updateField("tutorName", e.target.value)}
                   placeholder="Jordan Lee"
-                  className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
+                  className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
                   <label
                     htmlFor="rate"
-                    className="block text-sm font-medium text-zinc-700"
+                    className="block text-sm text-zinc-700"
                   >
                     Rate ($/hr)
                   </label>
@@ -274,13 +288,13 @@ export default function Home() {
                     value={formState.rate}
                     onChange={(e) => updateField("rate", e.target.value)}
                     placeholder="25"
-                    className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
+                    className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <label
                     htmlFor="slot"
-                    className="block text-sm font-medium text-zinc-700"
+                    className="block text-sm text-zinc-700"
                   >
                     Slot
                   </label>
@@ -290,18 +304,18 @@ export default function Home() {
                     min={nowForInput()}
                     value={formState.slot}
                     onChange={(e) => updateField("slot", e.target.value)}
-                    className="w-full rounded-lg border border-zinc-200 bg-white px-2 py-2 text-sm text-zinc-900 transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
+                    className="w-full rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-900 transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
                   />
                 </div>
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <label
                   htmlFor="description"
-                  className="block text-sm font-medium text-zinc-700"
+                  className="block text-sm text-zinc-700"
                 >
                   Notes{" "}
-                  <span className="font-normal text-zinc-400">(optional)</span>
+                  <span className="text-zinc-400">(optional)</span>
                 </label>
                 <textarea
                   id="description"
@@ -309,18 +323,20 @@ export default function Home() {
                   value={formState.description}
                   onChange={(e) => updateField("description", e.target.value)}
                   placeholder="What you'll cover, format, materials to bring…"
-                  className="w-full resize-none rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm leading-6 text-zinc-900 placeholder:text-zinc-400 transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
+                  className="w-full resize-none rounded-lg border border-zinc-200 bg-white px-4 py-3 text-sm leading-6 text-zinc-900 placeholder:text-zinc-400 transition duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1"
                 />
               </div>
 
               {formError && (
-                <p className="text-sm text-red-600">{formError}</p>
+                <p role="alert" className="text-sm text-red-600">
+                  {formError}
+                </p>
               )}
 
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition duration-150 hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition duration-150 hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {submitting ? "Posting…" : "Post listing"}
               </button>
@@ -344,11 +360,14 @@ export default function Home() {
             </div>
 
             {actionError && (
-              <div className="flex items-start justify-between gap-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div
+                role="alert"
+                className="flex items-start justify-between gap-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+              >
                 <p>{actionError}</p>
                 <button
                   onClick={() => setActionError(null)}
-                  className="shrink-0 font-semibold underline-offset-2 transition duration-150 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                  className="shrink-0 underline-offset-2 transition duration-150 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                 >
                   Dismiss
                 </button>
@@ -356,11 +375,12 @@ export default function Home() {
             )}
 
             {loading ? (
-              <div className="space-y-4">
+              <div role="status" aria-live="polite" className="space-y-4">
+                <span className="sr-only">Loading open tutoring sessions…</span>
                 {[0, 1, 2].map((i) => (
                   <div
                     key={i}
-                    className="animate-pulse rounded-xl border border-zinc-200 bg-white p-5"
+                    className="animate-pulse rounded-xl border border-zinc-200 bg-white p-6"
                   >
                     <div className="h-4 w-1/3 rounded bg-zinc-200" />
                     <div className="mt-3 h-3 w-1/2 rounded bg-zinc-100" />
@@ -370,12 +390,15 @@ export default function Home() {
                 ))}
               </div>
             ) : loadError ? (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
-                <p className="font-semibold">Couldn&apos;t load listings</p>
+              <div
+                role="alert"
+                className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-700"
+              >
+                <p className="font-semibold">Couldn&apos;t load open sessions</p>
                 <p className="mt-1 leading-6">{loadError}</p>
                 <button
                   onClick={loadListings}
-                  className="mt-4 rounded-lg border border-red-300 px-3 py-1.5 text-sm font-semibold text-red-700 transition duration-150 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                  className="mt-4 rounded-lg border border-red-300 px-4 py-2 text-sm text-red-700 transition duration-150 hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                 >
                   Try again
                 </button>
@@ -397,7 +420,7 @@ export default function Home() {
                   const isBooked = listing.status === "booked";
                   return (
                     <li key={listing.id}>
-                      <article className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition duration-150 hover:shadow-md">
+                      <article className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm transition duration-150 hover:shadow-md">
                         <div className="flex items-start justify-between gap-4">
                           <div className="min-w-0 space-y-1">
                             <div className="flex flex-wrap items-center gap-2">
@@ -405,7 +428,7 @@ export default function Home() {
                                 {listing.subject}
                               </h3>
                               {isBooked && (
-                                <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
+                                <span className="inline-flex items-center rounded-full bg-zinc-100 px-2 py-1 text-xs text-zinc-600">
                                   Booked
                                 </span>
                               )}
@@ -426,22 +449,20 @@ export default function Home() {
                         </div>
 
                         {listing.description && (
-                          <p className="mt-3 text-sm leading-6 text-zinc-600">
+                          <p className="mt-4 text-sm leading-6 text-zinc-600">
                             {listing.description}
                           </p>
                         )}
 
-                        <div className="mt-4 flex items-center justify-between border-t border-zinc-100 pt-4">
+                        <div className="mt-6 flex items-center justify-between border-t border-zinc-100 pt-6">
                           <p className="text-sm font-semibold text-zinc-900">
                             ${listing.rate.toFixed(2)}
-                            <span className="font-normal text-zinc-500">
-                              /hr
-                            </span>
+                            <span className="text-zinc-500">/hr</span>
                           </p>
                           <button
                             onClick={() => handleBook(listing.id)}
                             disabled={isBooked || isPending}
-                            className="rounded-lg border border-indigo-600 px-3 py-1.5 text-sm font-semibold text-indigo-600 transition duration-150 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:text-zinc-400 disabled:hover:bg-transparent"
+                            className="rounded-lg border border-indigo-600 px-4 py-2 text-sm text-indigo-600 transition duration-150 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:text-zinc-400 disabled:hover:bg-transparent"
                           >
                             {isBooked
                               ? "Slot taken"
